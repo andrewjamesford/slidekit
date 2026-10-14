@@ -1,6 +1,6 @@
 {
   "name": "@local/slidekit",
-  "version": "0.2.0",
+  "version": "0.2.0-sv.3",
   "private": true,
   "description": "Embeddable JavaScript slide editor with editable PowerPoint export",
   "type": "module",
@@ -66,14 +66,15 @@
   "overrides": {
     "pptxgenjs": {
       "image-size": "2.0.4"
-    }
+    },
+    "source-map-js": "1.2.2"
   },
   "license": "MIT",
   "author": "SamuelSupe",
   "homepage": "https://github.com/SamuelSupe/slidekit#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SamuelSupe/slidekit.git"
+    "url": "git+https://github.com/andrewjamesford/slidekit.git"
   },
   "bugs": {
     "url": "https://github.com/SamuelSupe/slidekit/issues"

@@ -2,6 +2,7 @@ import { imageSize } from 'image-size';
 import { ARROW_ENDS, BLOCK_ARROWS, SHAPES, createDocument, createElement, emptySlide, MAX_SLIDES, uid, validateDocument } from './document.js';
 import { at, attr, children, EMU_PER_PIXEL, numeric, openPptxPackage, relationshipId } from './pptx-package.js';
 import { readText } from './pptx-text.js';
+import { readSpeakerNotes } from './pptx-notes.js';
 import { readColor, readTheme } from './pptx-color.js';
 import { readGradient, readShadow } from './pptx-appearance.js';
 import { pictureChildren, rasterizeSvg, resolvePicture } from './pptx-images.js';
@@ -148,6 +149,13 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
     const colorMap = at(root, 'clrMapOvr/overrideClrMapping') || at(layout?.root, 'clrMapOvr/overrideClrMapping') || at(master?.root, 'clrMap');
     const theme = readTheme(themePart?.root, colorMap);
     const slide = emptySlide(attr(at(root, 'cSld'), 'name') || t('幻灯片 {number}', { number: pageNumber }));
+    const notesPart = await related(source, 'notesSlide');
+    if (notesPart) {
+      slide.notes = readSpeakerNotes(notesPart.root);
+      if (slide.notes || children(at(notesPart.root, 'cSld/spTree')).some(node => ['pic', 'graphicFrame', 'grpSp'].includes(node.localName) || (node.localName === 'sp' && !at(node, 'nvSpPr/nvPr/ph')))) {
+        warn('Speaker Notes imported as plain text. Notes formatting, drawings and custom layout are not preserved.');
+      }
+    }
     if (['0', 'false'].includes(attr(root, 'show'))) {
       slide.hidden = true;
       warn('隐藏页面已保留，放映时自动跳过');
@@ -178,13 +186,13 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
       if (picture) add(createElement('image', { ...picture, x: 0, y: 0, width: doc.width, height: doc.height, locked: true, fit: 'cover' }));
     }
     if (at(root, 'timing') || at(root, 'transition')) warn('动画和切换效果未导入');
-    async function visit(tree, path, parent = identity, inherited = false, depth = 0) {
+    async function visit(tree, path, parent = identity, inherited = false, depth = 0, horizontalReflection = false) {
       if (depth > 16) throw new Error('PPTX 组合对象嵌套过深');
       for (const node of children(tree)) {
         signal?.throwIfAborted();
         const kind = node.localName;
         if (['nvGrpSpPr', 'grpSpPr', 'extLst'].includes(kind)) continue;
-        if (kind === 'AlternateContent') { await visit(at(node, 'Fallback') || at(node, 'Choice'), path, parent, inherited, depth + 1); continue; }
+        if (kind === 'AlternateContent') { await visit(at(node, 'Fallback') || at(node, 'Choice'), path, parent, inherited, depth + 1, horizontalReflection); continue; }
         const nonVisual = children(node).map(child => at(child, 'cNvPr')).find(Boolean);
         if (truth(attr(nonVisual, 'hidden'))) {
           warn('隐藏对象「' + (attr(nonVisual, 'name') || kind) + '」已跳过');
@@ -194,7 +202,7 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
         if (inherited && ph) continue;
         if (kind === 'grpSp') {
           const group = transform(at(node, 'grpSpPr/xfrm'), parent, true);
-          await visit(node, path, group.matrix, inherited, depth + 1); continue;
+          await visit(node, path, group.matrix, inherited, depth + 1, horizontalReflection !== truth(attr(at(node, 'grpSpPr/xfrm'), 'flipH'))); continue;
         }
         const layoutShape = !inherited && inheritedShape(layout?.root, ph);
         const masterShape = !inherited && inheritedShape(master?.root, ph, true);
@@ -301,11 +309,18 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
           const text = readText(body, { theme, defaults: [at(presentation, 'defaultTextStyle'), at(master?.root, 'txStyles/' + category)].filter(Boolean), inheritedBodies: [at(masterShape, 'txBody'), at(layoutShape, 'txBody')].filter(Boolean), warn });
           const bodyProperties = at(body, 'bodyPr');
           const left = px(bodyProperties, 'lIns', 9.6), right = px(bodyProperties, 'rIns', 9.6), top = px(bodyProperties, 'tIns', 4.8), bottom = px(bodyProperties, 'bIns', 4.8);
-          const anchor = attr(bodyProperties, 'anchor');
-          if (anchor && anchor !== 't') warn('文本垂直对齐已按顶部对齐导入');
+          const anchor = [bodyProperties, at(layoutShape, 'txBody/bodyPr'), at(masterShape, 'txBody/bodyPr')].map(properties => attr(properties, 'anchor')).find(Boolean) || 't';
+          const verticalAlign = { t: 'top', ctr: 'middle', b: 'bottom' }[anchor] || 'top';
+          if (!['t', 'ctr', 'b'].includes(anchor)) warn('不支持的文本垂直对齐已按顶部对齐导入');
           if (attr(bodyProperties, 'vert') && attr(bodyProperties, 'vert') !== 'horz') warn('竖排文字已按横排导入');
           if (mirrored) warn('镜像文字已按正常方向导入');
-          add(createElement('text', { ...bounds(matrix, Math.max(1, width-left-right), Math.max(1, height-top-bottom), left, top), ...text, ...(!shapeAdded && shadow ? { shadow } : {}) }));
+          const textBox = bounds(matrix, Math.max(1, width-left-right), Math.max(1, height-top-bottom), left, top);
+          // Reflection changes the position of the inset box, not the text's
+          // reading direction. Remove the horizontal basis reversal while
+          // retaining rotation, reflected group angles and actual world bounds.
+          const reflectedHorizontally = horizontalReflection !== truth(attr(transformNode, 'flipH'));
+          textBox.rotation = ((textBox.rotation - (reflectedHorizontally ? 180 : 0) + 540) % 360) - 180;
+          add(createElement('text', { ...textBox, ...text, verticalAlign, ...(!shapeAdded && shadow ? { shadow } : {}) }));
         }
       }
     }

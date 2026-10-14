@@ -171,7 +171,7 @@ test('unsupported markup and missing image references fail at the document bound
   assert.throws(() => validateDocument(doc));
   doc.slides[0].elements = [createElement('image', { assetId: 'missing' })];
   assert.throws(() => validateDocument(doc));
-  doc.schemaVersion = 2;
+  doc.schemaVersion = 999;
   assert.throws(() => validateDocument(doc));
 });
 
@@ -1026,5 +1026,40 @@ test('save shortcut includes the active text session and remains available in vi
     assert.equal(prevented, 1);
     SlideEditor.prototype.keydown.call(owner, { ...event, isComposing: true });
     assert.equal(saved, 1);
+  }
+});
+
+
+test('text reflection retains readable rotation and mirrored inset positions through export', async () => {
+  const doc = createDocument('Reflected text');
+  doc.slides[0].elements = [createElement('text', {x: 100, y: 120, width: 300, height: 90, rotation: 25, content: paragraph('All characters retained')})];
+  const original = await exportPptx(doc);
+  for (const [horizontal, vertical] of [[true,false],[false,true],[true,true]]) {
+    const zip = await JSZip.loadAsync(await original.arrayBuffer());
+    const xml = new DOMParser().parseFromString(await zip.file('ppt/slides/slide1.xml').async('string'), 'application/xml');
+    const node = children(at(xml.documentElement, 'cSld/spTree'), 'sp')[0];
+    const xfrm = at(node, 'spPr/xfrm');
+    xfrm.setAttribute('flipH', horizontal ? '1' : '0'); xfrm.setAttribute('flipV', vertical ? '1' : '0');
+    zip.file('ppt/slides/slide1.xml', new XMLSerializer().serializeToString(xml));
+    const result = await readPptx(new Blob([await zip.generateAsync({type:'uint8array'})]));
+    const text = result.document.slides[0].elements.find(e => e.type === 'text');
+    assert.ok(Math.abs(text.rotation-25)<0.000001);
+    assert.equal(plainText(text.content), 'All characters retained');
+    const repeated = await readPptx(await exportPptx(result.document));
+    assert.ok(Math.abs(repeated.document.slides[0].elements[0].rotation-25)<0.000001);
+    assert.equal(plainText(repeated.document.slides[0].elements[0].content), 'All characters retained');
+  }
+});
+
+
+test('empty PPTX paragraphs stay empty while intentional literal spaces survive repeated export', async () => {
+  const doc=createDocument('Empty paragraph fidelity');
+  doc.slides[0].elements=[createElement('text',{content:{type:'doc',content:[{type:'paragraph',content:[]},{type:'paragraph',content:[{type:'text',text:'Visible'}]},{type:'paragraph',content:[]},{type:'paragraph',content:[{type:'text',text:' '}]},{type:'paragraph',content:[]}]}})];
+  const expected=plainText(doc.slides[0].elements[0].content);
+  let current=doc;
+  for(let i=0;i<3;i++){
+    current=(await readPptx(await exportPptx(current))).document;
+    assert.equal(plainText(current.slides[0].elements[0].content),expected);
+    assert.equal(current.slides[0].elements[0].content.content.length,5);
   }
 });

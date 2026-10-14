@@ -1,3 +1,4 @@
+import { normalizePptxParagraphs } from './pptx-normalize.js';
 import PptxGenJS from 'pptxgenjs';
 import { validateDocument } from './document.js';
 import { writePptxAppearance } from './pptx-appearance.js';
@@ -73,7 +74,6 @@ export function textRuns(element) {
         if (text) runs.push({ text, options: { ...options } });
       });
     }
-    if (runs.length === 1) runs[0].text = ' ';
     if (paragraphIndex < blocks.length - 1) runs.at(-1).options.breakLine = true;
     result.push(...runs);
   });
@@ -99,6 +99,8 @@ export async function exportPptx(input) {
   for (const source of doc.slides) {
     const slide = pptx.addSlide();
     slide.hidden = source.hidden === true;
+    // Empty notes deliberately produce an empty body rather than stale narration.
+    slide.addNotes(xmlText(source.notes));
     slide.background = { color: hex(source.background) };
     const objects = [];
     appearance.push({ gradient: source.backgroundGradient, objects });
@@ -114,7 +116,7 @@ export async function exportPptx(input) {
         slide.addText(object.runs.map(run => ({ ...run, options: { ...run.options } })), {
           ...bounds, objectName, rotate, transparency, margin: 0, breakLine: false,
           fontFace: element.fontFamily, fontSize: element.fontSize, color: hex(element.color),
-          valign: 'top', lineSpacingMultiple: element.lineHeight, paraSpaceAfter: 0,
+          valign: { top: 'top', middle: 'mid', bottom: 'bottom' }[element.verticalAlign || 'top'], lineSpacingMultiple: element.lineHeight, paraSpaceAfter: 0,
           lang: 'zh-CN', isTextBox: true, fit: 'none',
         });
       } else if (element.type === 'shape') {
@@ -144,5 +146,5 @@ export async function exportPptx(input) {
     }
   }
   const bytes = await pptx.write({ outputType: 'arraybuffer', compression: true });
-  return new Blob([await writePptxAppearance(bytes, appearance)], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+  return new Blob([await normalizePptxParagraphs(await writePptxAppearance(bytes, appearance))], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
 }

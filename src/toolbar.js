@@ -38,6 +38,12 @@ export class Toolbar {
       button(t('放映'), 'play', () => owner.run(() => owner.present()), 'sk-primary'),
     );
     right.firstChild.title = t('打开 PowerPoint PPTX、PDF 或 SlideKit JSON');
+    if (owner.options.ui?.open === false) right.firstChild.hidden = true;
+    if (owner.options.ui?.embedded === true) {
+      brand.hidden = true;
+      titleArea.hidden = true;
+      right.lastChild.hidden = true;
+    }
     header.append(brand, titleArea, right);
     const tools = dom('div', 'sk-tools');
     this.undo = button(t('撤销'), 'undo', () => owner.run(() => owner.undo()), 'sk-icon-only');

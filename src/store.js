@@ -126,13 +126,16 @@ export class DocumentStore {
     return slide.id;
   }
   updateSlide(id, patch) {
-    if (!this.doc.slides.some(slide => slide.id === id)) throw new Error('页面不存在');
+    const current = this.doc.slides.find(slide => slide.id === id);
+    if (!current) throw new Error('页面不存在');
+    if (Object.entries(patch).every(([key, value]) => JSON.stringify(current[key]) === JSON.stringify(value))) return;
     this.commit(doc => {
       const slide = doc.slides.find(slide => slide.id === id);
       if (patch.name !== undefined) slide.name = patch.name;
       if (patch.background !== undefined) slide.background = patch.background;
       if (patch.backgroundGradient !== undefined) slide.backgroundGradient = clone(patch.backgroundGradient);
       if (patch.hidden !== undefined) slide.hidden = patch.hidden;
+      if (patch.notes !== undefined) slide.notes = patch.notes;
     }, 'update-slide');
   }
   deleteSlide(id = this.slideId) {
@@ -205,6 +208,16 @@ export class DocumentStore {
       const index = elements.findIndex(item => item.id === id);
       const target = direction === 'front' ? elements.length - 1 : direction === 'back' ? 0 : Math.max(0, Math.min(elements.length - 1, index + direction));
       elements.splice(target, 0, elements.splice(index, 1)[0]);
+    }, 'layer');
+  }
+  moveElement(id, targetIndex) {
+    const elements = this.slide.elements;
+    const from = elements.findIndex(element => element.id === id);
+    if (from < 0 || !Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= elements.length) throw new TypeError('Invalid layer position');
+    if (elements[from].locked || from === targetIndex) return;
+    this.commit(doc => {
+      const list = doc.slides.find(slide => slide.id === this.slideId).elements;
+      list.splice(targetIndex, 0, list.splice(from, 1)[0]);
     }, 'layer');
   }
   copySelection() {

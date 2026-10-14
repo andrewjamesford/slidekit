@@ -5,7 +5,7 @@ import { Toolbar } from './toolbar.js';
 import { Panels } from './panels.js';
 import { dom, renderSlide, renderElement, positionElement, paintBackground, readImage, download } from './render.js';
 import { isColor, validateDocument } from './document.js';
-import { alignElements, distributeElements } from './geometry.js';
+import { alignElements, distributeElements, boundingBox } from './geometry.js';
 import { button } from './ui-controls.js';
 import { exportPptx } from './pptx.js';
 import { readPdf, resolvePdfLimits } from './pdf.js';
@@ -389,6 +389,7 @@ export class SlideEditor {
     input.click();
   }
   openDocument() {
+    if (this.options.ui?.open === false) return;
     const input = dom('input'); input.type = 'file'; input.accept = '.json,.pdf,.pptx,application/json,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation';
     input.addEventListener('change', () => this.run(async () => {
       const file = input.files[0]; if (!file) return;
@@ -470,6 +471,29 @@ export class SlideEditor {
     notice.append(summary, list);
     this.root.insertBefore(notice, this.main);
     this.importNotice = notice;
+  }
+  async fitTextBoxToContent(id) {
+    this.store.assertEditable();
+    this.text.flush({ throwOnError: true }); this.text.stop();
+    const original = this.store.slide.elements.find(element => element.id === id);
+    if (!original || original.type !== 'text' || original.locked) throw new Error('Select an unlocked text box');
+    const snapshot = JSON.stringify(original), generation = this.store.doc;
+    await document.fonts.ready;
+    this.store.assertEditable();
+    const current = this.store.slide.elements.find(element => element.id === id);
+    if (this.destroyed || this.store.doc !== generation || !current || current.locked || JSON.stringify(current) !== snapshot) throw new Error('Text changed while measuring; try again');
+    const clone = renderElement(current, this.store.doc.assets);
+    clone.style.left = '0'; clone.style.top = '-100000px'; clone.style.transform = 'none';
+    clone.style.height = 'auto'; clone.style.minHeight = '0'; clone.style.maxHeight = 'none'; clone.style.width = current.width + 'px';
+    clone.style.visibility = 'hidden'; clone.style.pointerEvents = 'none';
+    this.root.append(clone);
+    let height;
+    try { height = Math.max(1, Math.ceil(clone.scrollHeight) + 1); } finally { clone.remove(); }
+    if (height > 100000) throw new Error('Text height exceeds the supported geometry budget');
+    if (Math.abs(height - current.height) > 0.5) this.store.updateElement(id, { height });
+    const box = boundingBox([{ ...current, height }]);
+    if (box.x < 0 || box.y < 0 || box.x + box.width > this.store.doc.width || box.y + box.height > this.store.doc.height) this.notify('Text box fitted beyond the slide. Adjust its position or width.');
+    return height;
   }
   align(alignment) {
     this.run(() => { this.text.stop(); const changes = alignElements(this.store.elements, alignment, this.store.doc); if (changes.length) this.store.updateElements(changes); });

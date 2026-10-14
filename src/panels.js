@@ -7,7 +7,8 @@ export class Panels {
   constructor(owner) {
     this.owner = owner;
     const t = owner.t;
-    this.layerMode = false;
+    this.layerMode = 'properties';
+    this.inspectorId = 'sk-inspector-' + crypto.randomUUID();
     this.left = dom('aside', 'sk-thumbnails');
     this.left.setAttribute('aria-label', t('幻灯片列表'));
     this.right = dom('aside', 'sk-inspector');
@@ -71,19 +72,47 @@ export class Panels {
     const { owner, right } = this;
     const { store, t } = owner;
     right.setAttribute('aria-label', t('属性面板'));
-    if (right.contains(document.activeElement) && document.activeElement.matches('input,select')) return;
+    if (right.contains(document.activeElement) && document.activeElement.matches('input,select,textarea')
+      && this.inspectorSlideId === store.slideId
+      && (this.layerMode !== 'notes' || document.activeElement.value === store.slide.notes)) return;
     const tabs = dom('div', 'sk-inspector-tabs');
-    for (const [layer, label, glyph] of [[false, t('属性'), 'cursor'], [true, t('图层'), 'layers']]) {
-      const tab = button(label, glyph, () => { this.layerMode = layer; this.renderInspector(); }, this.layerMode === layer ? 'sk-active' : '');
+    tabs.setAttribute('role', 'tablist');
+    const modes = [['properties', t('属性'), 'cursor'], ['arrange', 'Arrange', 'layers'], ['notes', 'Notes', 'text']];
+    const activate = layer => {
+      this.layerMode = layer;
+      this.renderInspector();
+      right.querySelector('[role=tab][aria-selected="true"]')?.focus();
+    };
+    for (const [index, [layer, label, glyph]] of modes.entries()) {
+      const tab = button(label, glyph, () => activate(layer), 'sk-icon-only' + (this.layerMode === layer ? ' sk-active' : ''));
+      tab.id = this.inspectorId + '-' + layer;
+      tab.tabIndex = this.layerMode === layer ? 0 : -1;
+      tab.setAttribute('aria-controls', this.inspectorId + '-content');
+      tab.addEventListener('keydown', event => {
+        const next = event.key === 'ArrowRight' ? (index + 1) % modes.length
+          : event.key === 'ArrowLeft' ? (index + modes.length - 1) % modes.length
+          : event.key === 'Home' ? 0 : event.key === 'End' ? modes.length - 1 : -1;
+        if (next < 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        activate(modes[next][0]);
+      });
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', String(this.layerMode === layer));
       tabs.append(tab);
     }
     const content = dom('div', 'sk-inspector-content');
-    if (this.layerMode) this.renderLayers(content);
+    content.id = this.inspectorId + '-content';
+    content.setAttribute('role', 'tabpanel');
+    content.setAttribute('aria-labelledby', this.inspectorId + '-' + this.layerMode);
+    if (this.layerMode === 'arrange') this.renderLayers(content);
+    else if (this.layerMode === 'notes') this.renderNotes(content);
     else this.renderProperties(content);
     if (store.mode === 'view') {
-      content.querySelectorAll('input,select,button').forEach(control => { control.disabled = true; });
+      content.querySelectorAll('input,select,textarea,button').forEach(control => { control.disabled = true; });
     }
     right.replaceChildren(tabs, content);
+    this.inspectorSlideId = store.slideId;
   }
   renderProperties(content) {
     const { owner } = this, { store, t } = owner;
@@ -127,6 +156,18 @@ export class Panels {
       geometry.append(field(t('旋转 °'), numberInput(element.rotation, value => update({ rotation: value }))),
         field(t('不透明度 %'), numberInput(element.opacity * 100, value => update({ opacity: value / 100 }), { min: 0, max: 100 })));
       content.append(section(t('位置与尺寸'), geometry));
+      if (element.type === 'text') {
+        const fit = button('Fit text box to content', null, () => owner.run(() => owner.fitTextBoxToContent(element.id)));
+        fit.disabled = element.locked || store.mode !== 'edit';
+        fit.title = 'Keeps text size and width. Resizes height only.';
+        content.append(fit);
+        content.append(field('Vertical alignment', selectInput([['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']], element.verticalAlign || 'top', value => update({ verticalAlign: value }))));
+        const textNode = owner.elementNode(element.id);
+        if (textNode && Math.max(textNode.scrollHeight, textNode.firstElementChild?.scrollHeight || 0) > textNode.clientHeight + 1) {
+          const warning = dom('p', '', 'Text exceeds this box and will be clipped. Fit the text box to content or increase its height.');
+          warning.setAttribute('role', 'status'); content.append(warning);
+        }
+      }
       if (element.type === 'shape') {
         const appearance = section(t('外观'),
           ...(!element.gradient ? [field(t('填充'), colorInput(element.fill, value => update({ fill: value }), owner.t))] : []),
@@ -195,12 +236,34 @@ export class Panels {
     distribution.append(horizontal, vertical);
     content.append(section(t('对齐与分布'), alignment, distribution));
   }
+  renderNotes(content) {
+    const { owner } = this;
+    const label = dom('label', '', 'Notes / narration');
+    const input = dom('textarea', 'sk-notes');
+    input.setAttribute('aria-label', 'Notes / narration');
+    input.value = owner.store.slide.notes;
+    input.rows = 12;
+    input.addEventListener('input', () => owner.run(() => owner.store.updateSlide(owner.store.slideId, { notes: input.value })));
+    label.append(input);
+    const inner = dom('div', 'sk-inspector-section');
+    inner.append(label, dom('p', 'sk-note', 'Empty Notes means a silent slide. Audio regeneration is explicit.'));
+    content.append(inner);
+  }
   renderLayers(content) {
     const { owner } = this, { store, t } = owner;
     content.append(dom('p', 'sk-note', t('上方元素显示在前面。')));
     if (!store.slide.elements.length) content.append(dom('div', 'sk-empty', t('这一页还没有元素')));
     [...store.slide.elements].reverse().forEach(element => {
       const row = dom('div', 'sk-layer' + (store.selected.includes(element.id) ? ' sk-active' : ''));
+      row.dataset.elementId = element.id;
+      row.draggable = !element.locked && store.mode === 'edit';
+      row.addEventListener('dragstart', event => { event.dataTransfer.setData('application/x-slidekit-layer', element.id); });
+      row.addEventListener('dragover', event => { if (store.mode === 'edit') event.preventDefault(); });
+      row.addEventListener('drop', event => {
+        event.preventDefault();
+        const id = event.dataTransfer.getData('application/x-slidekit-layer');
+        if (id) owner.run(() => store.moveElement(id, store.slide.elements.findIndex(item => item.id === element.id)));
+      });
       const name = element.type === 'text' ? plainText(element.content).slice(0, 30) || t('空文本') : element.type === 'image' ? store.doc.assets[element.assetId].name : { rect: t('矩形'), roundRect: t('圆角矩形'), ellipse: t('椭圆'), line: t('直线'), arrow: t('箭头'), rightArrow: t('向右箭头'), leftArrow: t('向左箭头'), upArrow: t('向上箭头'), downArrow: t('向下箭头'), leftRightArrow: t('水平双向箭头'), upDownArrow: t('垂直双向箭头') }[element.shape];
       const select = button(name, element.type === 'shape' ? BLOCK_ARROWS.includes(element.shape) ? 'arrow' : element.shape : element.type, event => owner.run(() => {
         owner.text.stop();
@@ -209,6 +272,11 @@ export class Panels {
       row.append(select, button(element.locked ? t('解锁') : t('锁定'), element.locked ? 'lock' : 'unlock', () => owner.run(() => {
         owner.text.stop(); store.updateElement(element.id, { locked: !element.locked });
       }), 'sk-icon-only'));
+      for (const [label, direction] of [['Move layer forward', 1], ['Move layer backward', -1]]) {
+        const move = button(label, direction === 1 ? 'up' : 'down', () => owner.run(() => store.reorderElement(element.id, direction)), 'sk-icon-only');
+        move.disabled = element.locked;
+        row.append(move);
+      }
       content.append(row);
     });
   }

@@ -125,7 +125,7 @@
 .slidekit .sk-text em { font-style: italic; }
 .slidekit .sk-text u { text-decoration: underline; }
 .slidekit .sk-editing { outline: 1px solid var(--sk-accent); overflow: visible; }
-.slidekit .sk-text-input { outline: none; min-height: 100%; user-select: text; cursor: text; touch-action: auto; }
+.slidekit .sk-text-input { outline: none; min-height: 0; flex-shrink: 0; user-select: text; cursor: text; touch-action: auto; }
 .slidekit .sk-text-input * { user-select: text; }
 .slidekit .moveable-control { --moveable-color: var(--sk-accent); background: #fff !important; border: 1.5px solid var(--sk-accent) !important; border-radius: 2px !important; }
 .slidekit .moveable-line { --moveable-color: var(--sk-accent); }
@@ -215,3 +215,5 @@
 @media (prefers-reduced-motion: reduce) {
   .slidekit *, .slidekit *::before, .slidekit *::after { transition: none !important; }
 }
+
+.slidekit .sk-notes { width:100%; min-height:180px; resize:vertical; font:inherit; padding:10px; border:1px solid var(--sk-border); }

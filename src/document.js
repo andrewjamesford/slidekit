@@ -77,12 +77,12 @@ export function paragraph(text = '') {
 }
 
 export function emptySlide(name = '新幻灯片') {
-  return { id: uid(), name, background: '#ffffff', elements: [] };
+  return { id: uid(), name, background: '#ffffff', notes: '', elements: [] };
 }
 
 /** @returns {Deck} */
 export function createDocument(title = '未命名演示文稿') {
-  return { schemaVersion: 1, title, width: 1280, height: 720, slides: [emptySlide('幻灯片 1')], assets: {} };
+  return { schemaVersion: 2, title, width: 1280, height: 720, slides: [emptySlide('幻灯片 1')], assets: {} };
 }
 
 /**
@@ -174,13 +174,18 @@ export function validateText(root) {
  * @returns {Deck}
  */
 export function validateDocument(input) {
-  check(input && input.schemaVersion === 1, '不支持的文稿版本（需要 schemaVersion: 1）');
-  return validateDocumentInPlace(cloneDocument(input));
+  check(input && [1, 2].includes(input.schemaVersion), 'Unsupported document schema version');
+  const doc = cloneDocument(input);
+  if (doc.schemaVersion === 1) {
+    doc.schemaVersion = 2;
+    for (const slide of doc.slides || []) slide.notes = slide.notes ?? '';
+  }
+  return validateDocumentInPlace(doc);
 }
 
 /** @internal Mutates an owned draft; discard the draft if validation fails. */
 export function validateDocumentInPlace(doc) {
-  check(doc && doc.schemaVersion === 1, '不支持的文稿版本（需要 schemaVersion: 1）');
+  check(doc && doc.schemaVersion === 2, 'Unsupported document schema version');
   check(typeof doc.title === 'string' && doc.title.length <= 500, '文稿标题无效');
   number(doc.width, '页面宽度', 100, 10000);
   number(doc.height, '页面高度', 100, 10000);
@@ -200,6 +205,7 @@ export function validateDocumentInPlace(doc) {
   }
   for (const slide of doc.slides) {
     id(slide.id);
+    check(typeof slide.notes === 'string' && slide.notes.length <= 100000, 'Notes must be text of at most 100000 characters');
     check(typeof slide.name === 'string' && isColor(slide.background), '页面属性无效');
     if (slide.hidden !== undefined) check(typeof slide.hidden === 'boolean', '页面隐藏状态无效');
     if (slide.backgroundGradient != null) slide.backgroundGradient = validateGradient(slide.backgroundGradient);
@@ -230,6 +236,7 @@ export function validateDocumentInPlace(doc) {
       }
       if (element.type === 'text') {
         element.content = validateText(element.content);
+        if (element.verticalAlign !== undefined) check(['top', 'middle', 'bottom'].includes(element.verticalAlign), '文字垂直对齐无效');
         number(element.fontSize, '字号', 1, 256);
         number(element.lineHeight, '行距', 0.8, 3);
         check(isColor(element.color) && isFontFamily(element.fontFamily), '文字样式无效');

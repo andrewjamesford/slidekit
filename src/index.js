@@ -3,6 +3,7 @@ import { SlideEditor } from './editor.js';
 
 export { createDocument, createElement, paragraph, validateDocument } from './document.js';
 export { exportPptx } from './pptx.js';
+export { mountStaticSlide } from './static-slide.js';
 export { DEFAULT_PDF_LIMITS } from './pdf.js';
 export { SUPPORTED_LOCALES } from './i18n.js';
 
@@ -26,14 +27,15 @@ export { SUPPORTED_LOCALES } from './i18n.js';
  * @property {(doc: Deck) => void} setDocument Loads a validated document and clears undo history.
  * @property {(file: File|Blob, options?: PdfImportOptions) => Promise<void>} importPdf Opens PDF pages as embedded images; replaces the deck only after successful conversion. Abort rejects without replacing it.
  * @property {(file: File|Blob, options?: PptxImportOptions) => Promise<PptxImportResult>} importPptx Opens supported editable PPTX objects atomically. Returns fidelity warnings; rejects damaged files or cancellation without replacing the deck.
- * @property {(properties?: {name?: string, background?: string, backgroundGradient?: Gradient|null, hidden?: boolean}, index?: number) => string} addSlide Inserts after the current page by default.
+ * @property {(properties?: {name?: string, background?: string, backgroundGradient?: Gradient|null, hidden?: boolean, notes?: string}, index?: number) => string} addSlide Inserts after the current page by default.
  * @property {(id?: string) => string} duplicateSlide
- * @property {(id: string, patch: {name?: string, background?: string, backgroundGradient?: Gradient|null, hidden?: boolean}) => void} updateSlide
+ * @property {(id: string, patch: {name?: string, background?: string, backgroundGradient?: Gradient|null, hidden?: boolean, notes?: string}) => void} updateSlide
  * @property {(id?: string) => void} deleteSlide Deleting the last page creates a blank page.
  * @property {(id: string, index: number) => void} moveSlide Uses a zero-based destination index.
  * @property {(id: string) => void} goToSlide
  * @property {(type: 'text'|'shape'|'image', properties?: Partial<SlideElement>) => string} addElement Adds to the current page.
  * @property {(id: string, patch: Partial<SlideElement>) => void} updateElement Updates an element on the current page.
+ * @property {(id: string, targetIndex: number) => void} moveElement Move an unlocked element to a back-to-front index.
  * @property {(ids?: string[]) => void} deleteElements Locked elements are preserved.
  * @property {(file: File|Blob, properties?: Partial<SlideElement>) => Promise<string>} addImage Embeds PNG/JPEG, normalizes WebP to PNG.
  * @property {(ids: string[]) => void} selectElements
@@ -44,6 +46,7 @@ export { SUPPORTED_LOCALES } from './i18n.js';
  * @property {(locale: EditorLocale) => void} setLocale Changes UI language without changing document content, selection or history. Invalid locales throw before changing the instance.
  * @property {() => Promise<void>} present
  * @property {() => void} exitPresent
+ * @property {(id: string) => Promise<number>} fitTextBoxToContent Resizes only height, explicitly, with loaded fonts and one undo step.
  * @property {() => Promise<Blob>} exportPptx
  * @property {(event: EditorEvent, handler: (payload: any) => void) => () => void} on
  * @property {() => void} destroy Idempotent. Releases listeners, observers, controls and owned DOM.
@@ -74,6 +77,7 @@ export function createEditor(container, options = {}) {
     setDocument: guard(doc => editor.setDocument(doc)),
     importPdf: guard((file, options) => editor.importPdf(file, options)),
     importPptx: guard((file, options) => editor.importPptx(file, options)),
+    fitTextBoxToContent: guard(id => editor.fitTextBoxToContent(id)),
     addSlide: mutate((properties, index) => editor.store.addSlide(properties, index)),
     duplicateSlide: mutate(id => editor.store.duplicateSlide(id)),
     updateSlide: mutate((id, patch) => editor.store.updateSlide(id, patch)),
@@ -83,6 +87,7 @@ export function createEditor(container, options = {}) {
     addElement: mutate((type, properties) => editor.store.addElement(type, properties)),
     updateElement: mutate((id, patch) => editor.store.updateElement(id, patch)),
     deleteElements: mutate(ids => editor.store.deleteElements(ids)),
+    moveElement: mutate((id, targetIndex) => editor.store.moveElement(id, targetIndex)),
     addImage: guard((file, properties) => editor.addImage(file, properties)),
     selectElements: guard(ids => { editor.text.stop(); editor.store.selectElements(ids); }),
     undo: guard(() => editor.undo()),
