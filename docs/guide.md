@@ -179,6 +179,8 @@ All elements include `id`, `type`, `x`, `y`, `width`, `height`, `rotation`, `opa
 
 ### Text
 
+Text elements may set `textOverflow: 'visible'` to paint glyphs beyond the text frame. Omitting it or setting `'hidden'` keeps the existing clipped browser rendering. This option is retained in JSON and history; PowerPoint text-frame export behavior is unchanged.
+
 Text elements add `content`, `fontFamily`, `fontSize` (1–256pt), `color` (six-digit hex), and `lineHeight` (0.8–3). Rich text uses a restricted Tiptap JSON tree:
 
 - Nodes: `doc`, `paragraph`, `text`, `hardBreak`, `bulletList`, `orderedList`, `listItem`.

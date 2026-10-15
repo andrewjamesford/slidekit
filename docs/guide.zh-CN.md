@@ -197,6 +197,7 @@ editor.on('error', ({ error, message }) => { /* UI 操作错误 */ });
 
 元素通用属性为 `id / type / x / y / width / height / rotation / opacity / locked`。坐标和尺寸是固定逻辑像素，旋转单位为度（绕元素中心），不透明度为 0–1；画布显示缩放不会改变数据。`elements` 数组从底层到顶层排列。
 
+- 文字溢出：`textOverflow: 'visible'` 允许字形绘制到文本框外；省略或设为 `'hidden'` 时保持原有裁剪。JSON 和撤销历史保留此属性，PowerPoint 文本框导出行为不变。
 - 文字：`fontFamily / fontSize / color / lineHeight / content`。字号为 **pt**；行距为倍数。富文本使用受限的 Tiptap JSON：`doc / paragraph / text / hardBreak / bulletList / orderedList / listItem`，标记为 `bold / italic / underline / textStyle`。`textStyle` 支持 `fontFamily`、`fontSize: '32pt'`、`color: '#5c5bd6'`、`opacity: 0.5`。局部不透明度与文本框的 `opacity` 相乘；PPTX 导入会将统一透明度还原到文本框，不同文字片段的透明度分别保留。浏览器粘贴的命名色、短十六进制、RGB/HSL 等 CSS 颜色会规范化为文档颜色，颜色中的 alpha 合并到局部不透明度；无法解析的颜色使用默认文字色，文字内容仍保留。
 - 形状：`shape: 'rect' | 'roundRect' | 'ellipse' | 'line' | 'arrow'`，另支持 `rightArrow / leftArrow / upArrow / downArrow / leftRightArrow / upDownArrow`；`fill`、`stroke`、`strokeWidth`。填充可以为 `'transparent'`，其余颜色为六位十六进制。可选 `fillOpacity`、`strokeOpacity` 为 0–1，缺省为 1，分别与对象 `opacity` 相乘；渐变色标再乘入填充不透明度。描边及箭头端点共享描边不透明度，PPTX 往返保留实际透明度。
 - 图片：`assetId / fit`，`fit` 为 `'contain' | 'cover'`。资源表条目为 `{data: 'data:image/png;base64,...', width, height, name}`；所有图片都内嵌，JSON 可离线独立恢复。

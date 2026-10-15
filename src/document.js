@@ -234,6 +234,7 @@ export function validateDocumentInPlace(doc) {
         element.points = element.points.map(point => ({ x: number(point?.x, '路径点 X'), y: number(point?.y, '路径点 Y') }));
         check(element.points.some(point => point.x !== element.points[0].x || point.y !== element.points[0].y), '折线路径不能全部重合');
       }
+      if (element.textOverflow !== undefined) check(element.type === 'text' && ['hidden', 'visible'].includes(element.textOverflow), '文字溢出模式无效');
       if (element.type === 'text') {
         element.content = validateText(element.content);
         if (element.verticalAlign !== undefined) check(['top', 'middle', 'bottom'].includes(element.verticalAlign), '文字垂直对齐无效');

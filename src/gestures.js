@@ -1,6 +1,6 @@
 import Moveable from 'moveable';
 import Selecto from 'selecto';
-import { positionElement } from './render.js';
+import { positionElement, usesLayoutPosition } from './render.js';
 
 export class Gestures {
   constructor(owner) {
@@ -58,9 +58,10 @@ export class Gestures {
     if (!element || element.locked) { event.stop(); return; }
     this.owner.root.focus({ preventScroll: true });
     this.origins.set(element.id, element);
-    if (operation === 'drag') event.set([element.x, element.y]);
+    const translation = usesLayoutPosition(element) ? [0, 0] : [element.x, element.y];
+    if (operation === 'drag') event.set(translation);
     else {
-      event.dragStart && event.dragStart.set([element.x, element.y]);
+      event.dragStart && event.dragStart.set(translation);
       if (operation === 'resize') {
         event.set([element.width, element.height]);
         event.setMin([12, 12]);
@@ -74,11 +75,20 @@ export class Gestures {
     if (!original) return;
     const next = { ...original };
     const translate = operation === 'drag' ? event.beforeTranslate : event.drag?.beforeTranslate;
-    if (translate) [next.x, next.y] = translate;
+    if (translate) {
+      const origin = usesLayoutPosition(original) ? [original.x, original.y] : [0, 0];
+      next.x = origin[0] + translate[0];
+      next.y = origin[1] + translate[1];
+    }
     if (operation === 'resize') { next.width = Math.max(1, event.width); next.height = Math.max(1, event.height); }
     if (operation === 'rotate') next.rotation = event.beforeRotation;
     this.drafts.set(id, next);
-    positionElement(event.target, next);
+    // Keep Moveable's original layout basis throughout a rotation. Switching
+    // left/top to transform translation mid-gesture makes it count the offset twice.
+    if (operation === 'rotate' && usesLayoutPosition(original)) {
+      positionElement(event.target, { ...next, rotation: 0 });
+      event.target.style.transform = 'rotate(' + next.rotation + 'deg)';
+    } else positionElement(event.target, next);
   }
   finish() {
     const updates = [...this.drafts.values()].map(element => ({

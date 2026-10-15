@@ -92,11 +92,18 @@ function shapeNode(element) {
   return svg;
 }
 
+// CSS transforms can rasterize wrapped text differently even when Range boxes match.
+// Keep unrotated text in layout coordinates, shared by editing and static rendering.
+export function usesLayoutPosition(element) {
+  return element.type === 'text' && element.rotation % 360 === 0;
+}
+
 export function positionElement(node, element) {
+  const layout = usesLayoutPosition(element);
   Object.assign(node.style, {
-    left: '0', top: '0',
+    left: layout ? element.x + 'px' : '0', top: layout ? element.y + 'px' : '0',
     width: element.width + 'px', height: element.height + 'px',
-    transform: 'translate(' + element.x + 'px, ' + element.y + 'px) rotate(' + element.rotation + 'deg)', opacity: String(element.opacity),
+    transform: layout ? 'none' : 'translate(' + element.x + 'px, ' + element.y + 'px) rotate(' + element.rotation + 'deg)', opacity: String(element.opacity),
     filter: element.shadow ? shadowCss(element.shadow, element.rotation) : '',
   });
 }
@@ -108,6 +115,7 @@ export function renderElement(element, assets) {
   positionElement(node, element);
   if (['line', 'arrow'].includes(element.shape)) node.style.overflow = 'visible';
   if (element.type === 'text') {
+    node.style.overflow = element.textOverflow === 'visible' ? 'visible' : 'hidden';
     Object.assign(node.style, { fontFamily: element.fontFamily, fontSize: element.fontSize + 'pt', color: element.color, lineHeight: String(element.lineHeight) });
     node.style.display = 'flex'; node.style.flexDirection = 'column';
     node.style.justifyContent = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[element.verticalAlign || 'top'];
