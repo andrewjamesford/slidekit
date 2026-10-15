@@ -75,3 +75,10 @@ test('retained XML-invalid source refuses export instead of replacing bytes', as
  const d = createDocument(); d.slides[0].elements.push(createElement('text', { retained, opacity: 0, content: paragraph('Keep\u0000exact') }));
  await assert.rejects(exportPptx(d), /XML-invalid/); assert.equal(plainText(d.slides[0].elements[0].content), 'Keep\u0000exact');
 });
+
+
+test('frame and retained appearance export does not depend on browser XML globals', async () => {
+ const parser = globalThis.DOMParser, serializer = globalThis.XMLSerializer;
+ try { delete globalThis.DOMParser; delete globalThis.XMLSerializer; const d = imageDoc(); d.slides[0].elements.push(createElement('text', { retained, opacity: 0, content: paragraph('Retained') })); assert.ok((await exportPptx(d)).size > 0); }
+ finally { globalThis.DOMParser = parser; globalThis.XMLSerializer = serializer; }
+});

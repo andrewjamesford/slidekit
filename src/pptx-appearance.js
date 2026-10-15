@@ -1,3 +1,4 @@
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { writeMigrationAppearance } from './pptx-migration.js';
 import JSZip from 'jszip';
 import { at, attr, children, EMU_PER_PIXEL, numeric } from './pptx-package.js';
