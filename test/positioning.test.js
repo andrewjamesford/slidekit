@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDocument, createElement, validateDocument } from '../src/document.js';
 import { DocumentStore } from '../src/store.js';
-import { positionElement } from '../src/render.js';
+import { positionElement, renderElement, usesCssPrimitive } from '../src/render.js';
 
 test('fractional unrotated text uses layout coordinates without a raster transform', () => {
   const node = { style: {} };
@@ -56,4 +56,36 @@ test('untrusted overflow CSS and overflow on non-text elements are rejected atom
   }
   const doc = createDocument(); doc.slides[0].elements.push(createElement('shape', { textOverflow: 'visible' }));
   assert.throws(() => validateDocument(doc));
+});
+
+
+test('flat CSS shapes use fractional layout coordinates and paint on the opacity wrapper', () => {
+  const previous = globalThis.document;
+  globalThis.document = { createElement: () => ({ style: {}, dataset: {}, children: [], append(child) { this.children.push(child); } }) };
+  try {
+    for (const shape of ['rect', 'ellipse']) {
+      const element = { type: 'shape', shape, x: 4.125, y: 8.25, width: 110.5, height: 70.25, rotation: 0, opacity: 0.15, fill: '#123456', strokeWidth: 0 };
+      const node = renderElement(element, {});
+      assert.equal(node.style.left, '4.125px');
+      assert.equal(node.style.top, '8.25px');
+      assert.equal(node.style.transform, 'none');
+      assert.equal(node.style.backgroundColor, '#123456');
+      assert.equal(node.style.borderRadius, shape === 'ellipse' ? '50%' : '0');
+      assert.equal(node.style.opacity, '0.15');
+      assert.equal(node.children.length, 0);
+      positionElement(node, { ...element, rotation: 15 });
+      assert.equal(node.style.left, '0');
+      assert.equal(node.style.transform, 'translate(4.125px, 8.25px) rotate(15deg)');
+    }
+  } finally { globalThis.document = previous; }
+});
+
+test('complex geometry and appearance keep the SVG renderer', () => {
+  const flat = { type: 'shape', shape: 'ellipse', strokeWidth: 0 };
+  assert.equal(usesCssPrimitive(flat), true);
+  for (const patch of [
+    { type: 'image' }, { shape: 'roundRect' }, { shape: 'line' },
+    { strokeWidth: 1 }, { strokeWidth: undefined }, { fillOpacity: 0.5 },
+    { gradient: { stops: [] } }, { shadow: {} },
+  ]) assert.equal(usesCssPrimitive({ ...flat, ...patch }), false);
 });

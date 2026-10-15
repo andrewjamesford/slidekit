@@ -92,10 +92,18 @@ function shapeNode(element) {
   return svg;
 }
 
-// CSS transforms can rasterize wrapped text differently even when Range boxes match.
-// Keep unrotated text in layout coordinates, shared by editing and static rendering.
+// Match CSS painting for flat rectangles and ellipses, including fractional edges.
+// Complex fills and strokes keep their SVG geometry.
+export function usesCssPrimitive(element) {
+  return element.type === 'shape' && ['rect', 'ellipse'].includes(element.shape)
+    && element.strokeWidth === 0 && (element.fillOpacity ?? 1) === 1
+    && !element.gradient && !element.shadow;
+}
+
+// Transforms can rasterize wrapped text and CSS edges differently.
+// Share layout coordinates between editing and static rendering.
 export function usesLayoutPosition(element) {
-  return element.type === 'text' && element.rotation % 360 === 0;
+  return (element.type === 'text' || usesCssPrimitive(element)) && element.rotation % 360 === 0;
 }
 
 export function positionElement(node, element) {
@@ -127,6 +135,9 @@ export function renderElement(element, assets) {
     image.draggable = false;
     image.style.objectFit = element.fit;
     node.append(image);
+  } else if (usesCssPrimitive(element)) {
+    node.style.backgroundColor = element.fill;
+    node.style.borderRadius = element.shape === 'ellipse' ? '50%' : '0';
   } else node.append(shapeNode(element));
   return node;
 }
