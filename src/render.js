@@ -103,7 +103,7 @@ export function usesCssPrimitive(element) {
 // Transforms can rasterize wrapped text and CSS edges differently.
 // Share layout coordinates between editing and static rendering.
 export function usesLayoutPosition(element) {
-  return (element.type === 'text' || usesCssPrimitive(element)) && element.rotation % 360 === 0;
+  return (element.type === 'text' || usesCssPrimitive(element) || element.type === 'image' && element.frame) && element.rotation % 360 === 0;
 }
 
 export function positionElement(node, element) {
@@ -119,7 +119,8 @@ export function positionElement(node, element) {
 export function renderElement(element, assets) {
   const node = dom('div', 'sk-element sk-' + element.type);
   node.dataset.elementId = element.id;
-  node.dataset.locked = String(element.locked);
+  node.dataset.locked = String(element.locked || !!element.retained);
+  if (element.retained) { node.style.pointerEvents = 'none'; node.dataset.retained = 'true'; }
   positionElement(node, element);
   if (['line', 'arrow'].includes(element.shape)) node.style.overflow = 'visible';
   if (element.type === 'text') {
@@ -134,6 +135,12 @@ export function renderElement(element, assets) {
     image.alt = assets[element.assetId].name;
     image.draggable = false;
     image.style.objectFit = element.fit;
+    if (element.frame) {
+      const f = element.frame, h = f.shadow;
+      node.style.overflow = 'visible';
+      image.style.borderRadius = f.radius + 'px';
+      image.style.boxShadow = h.offsetX + 'px ' + h.offsetY + 'px ' + h.blur + 'px ' + 'rgba(' + [1,3,5].map(i => parseInt(h.color.slice(i,i+2),16)).join(',') + ',' + h.opacity + ')' ;
+    }
     node.append(image);
   } else if (usesCssPrimitive(element)) {
     node.style.backgroundColor = element.fill;

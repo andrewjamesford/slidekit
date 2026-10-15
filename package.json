@@ -1,6 +1,6 @@
 {
   "name": "@local/slidekit",
-  "version": "0.2.0-sv.5",
+  "version": "0.2.0-sv.6",
   "private": true,
   "description": "Embeddable JavaScript slide editor with editable PowerPoint export",
   "type": "module",

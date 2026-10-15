@@ -136,10 +136,12 @@ export async function exportPptx(input) {
         });
       } else {
         const asset = doc.assets[element.assetId];
-        const sizing = { type: element.fit, w: bounds.w, h: bounds.h };
+        object.asset = asset;
+
+        const sizing = { type: element.frame && element.fit === 'cover' ? 'crop' : element.fit, w: bounds.w, h: bounds.h };
         slide.addImage({
           data: asset.data, x: bounds.x, y: bounds.y,
-          w: inch(asset.width), h: inch(asset.height), sizing,
+          ...(element.frame && element.fit === 'contain' ? { w: bounds.w, h: bounds.h } : { w: inch(asset.width), h: inch(asset.height), sizing }),
           objectName, rotate, transparency, altText: xmlText(asset.name),
         });
       }

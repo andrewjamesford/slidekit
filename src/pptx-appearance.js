@@ -1,3 +1,4 @@
+import { writeMigrationAppearance } from './pptx-migration.js';
 import JSZip from 'jszip';
 import { at, attr, children, EMU_PER_PIXEL, numeric } from './pptx-package.js';
 import { readColor } from './pptx-color.js';
@@ -89,7 +90,7 @@ function writeConnectorPath(owner, points) {
 
 /** PptxGenJS has no native gradient option. Add DrawingML paint to its editable objects. */
 export async function writePptxAppearance(bytes, slides) {
-  if (!slides.some(slide => slide.gradient || slide.objects.some(({ element, runs }) => element.gradient || element.shadow || element.points || element.arrowShaft !== undefined || element.arrowHead !== undefined || runs?.some(run => run.options.gradient)))) return bytes;
+  if (!slides.some(slide => slide.gradient || slide.objects.some(({ element, runs }) => element.frame || element.retained || element.gradient || element.shadow || element.points || element.arrowShaft !== undefined || element.arrowHead !== undefined || runs?.some(run => run.options.gradient)))) return bytes;
   const zip = await JSZip.loadAsync(bytes);
   for (let index = 0; index < slides.length; index++) {
     const source = slides[index];
@@ -106,6 +107,8 @@ export async function writePptxAppearance(bytes, slides) {
       const properties = at(node, 'spPr');
       if (element.gradient) writeGradient(properties, element.gradient, element.opacity * (element.fillOpacity ?? 1));
       if (element.shadow) writeShadow(properties, element.shadow);
+      if (element.frame) writeShadow(properties, element.frame.shadow);
+      writeMigrationAppearance(node, element, object.asset);
       if (element.points) writeConnectorPath(properties, element.points);
       if (element.arrowShaft !== undefined || element.arrowHead !== undefined) {
         const adjustments = at(properties, 'prstGeom/avLst');

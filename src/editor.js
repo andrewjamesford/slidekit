@@ -330,7 +330,7 @@ export class SlideEditor {
       this.run(() => key === 'y' || event.shiftKey ? this.redo() : this.undo()); return;
     }
     if (this.text.id) return;
-    if (mod && key === 'a') { event.preventDefault(); this.store.selectElements(this.store.slide.elements.filter(element => !element.locked).map(element => element.id)); }
+    if (mod && key === 'a') { event.preventDefault(); this.store.selectElements(this.store.slide.elements.filter(element => !element.locked && !element.retained).map(element => element.id)); }
     else if (mod && key === 'd') { event.preventDefault(); this.run(() => this.store.pasteSelection(this.store.copySelection())); }
     else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); this.run(() => this.store.deleteElements()); }
     else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) && this.store.selected.length) {

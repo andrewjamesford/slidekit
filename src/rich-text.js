@@ -113,7 +113,7 @@ export class RichTextSession {
   }
   start(id) {
     const element = this.owner.store.slide.elements.find(item => item.id === id);
-    if (!element || element.type !== 'text' || element.locked || this.owner.store.mode !== 'edit') return;
+    if (!element || element.retained || element.type !== 'text' || element.locked || this.owner.store.mode !== 'edit') return;
     if (this.id === id) { this.editor.commands.focus(); return; }
     this.stop();
     this.owner.store.selectElements([id]);

@@ -71,6 +71,20 @@ function validateShadow(shadow) {
   };
 }
 
+// These finite migration fields never accept raw CSS or arbitrary metadata.
+export function validateImageFrame(frame) {
+  check(frame && Object.keys(frame).sort().join() === 'radius,shadow', 'Invalid image frame');
+  const shadow = validateShadow(frame.shadow);
+  check(Object.keys(frame.shadow).sort().join() === 'blur,color,offsetX,offsetY,opacity,rotateWithShape' && shadow.rotateWithShape && shadow.blur <= 128 && Math.abs(shadow.offsetX) <= 256 && Math.abs(shadow.offsetY) <= 256, 'Unsupported frame shadow');
+  return { radius: number(frame.radius, 'Frame radius', 0, 128), shadow };
+}
+export function validateRetainedText(retained) {
+  check(retained && Object.keys(retained).sort().join() === 'kind,sourceIndex,sourceSlideId' && retained.kind === 'legacy-hidden-bullet', 'Invalid retained text');
+  check(typeof retained.sourceSlideId === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(retained.sourceSlideId), 'Invalid retained source slide');
+  check(Number.isInteger(retained.sourceIndex), 'Invalid retained source index');
+  return { kind: 'legacy-hidden-bullet', sourceSlideId: retained.sourceSlideId, sourceIndex: number(retained.sourceIndex, 'Retained source index', 0, 9999) };
+}
+
 /** @returns {TextNode} */
 export function paragraph(text = '') {
   return { type: 'doc', content: [{ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] }] };
@@ -218,6 +232,14 @@ export function validateDocumentInPlace(doc) {
       number(element.opacity, '透明度', 0, 1);
       check(typeof element.locked === 'boolean', '锁定状态无效');
       if (element.shadow != null) element.shadow = validateShadow(element.shadow);
+      if (element.frame !== undefined) {
+        check(element.type === 'image' && !element.shadow, 'Frame requires an image without a second shadow');
+        element.frame = validateImageFrame(element.frame);
+      }
+      if (element.retained !== undefined) {
+        check(element.type === 'text' && element.opacity === 0, 'Retained text must remain non-rendering');
+        element.retained = validateRetainedText(element.retained);
+      }
       if (element.gradient != null) {
         check(element.type === 'shape', '元素渐变填充仅适用于形状');
         element.gradient = validateGradient(element.gradient);

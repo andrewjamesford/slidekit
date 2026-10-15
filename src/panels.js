@@ -1,6 +1,6 @@
 import { dom, renderSlide } from './render.js';
 import { icon } from './icons.js';
-import { plainText, PAGE_SIZES, BLOCK_ARROWS } from './document.js';
+import { paragraph, plainText, PAGE_SIZES, BLOCK_ARROWS } from './document.js';
 import { button, field, numberInput, selectInput, colorInput, section } from './ui-controls.js';
 
 export class Panels {
@@ -74,7 +74,8 @@ export class Panels {
     right.setAttribute('aria-label', t('属性面板'));
     if (right.contains(document.activeElement) && document.activeElement.matches('input,select,textarea')
       && this.inspectorSlideId === store.slideId
-      && (this.layerMode !== 'notes' || document.activeElement.value === store.slide.notes)) return;
+      && (this.layerMode !== 'notes' || document.activeElement.value === store.slide.notes)
+      && (!document.activeElement.dataset.retainedId || document.activeElement.dataset.retainedId === store.selected[0] && document.activeElement.value === plainText(store.elements[0]?.content || { content: [] }))) return;
     const tabs = dom('div', 'sk-inspector-tabs');
     tabs.setAttribute('role', 'tablist');
     const modes = [['properties', t('属性'), 'cursor'], ['arrange', 'Arrange', 'layers'], ['notes', 'Notes', 'text']];
@@ -148,6 +149,16 @@ export class Panels {
     content.append(dom('div', 'sk-element-heading', heading));
     if (selected.length === 1) {
       const element = selected[0];
+      if (element.retained) {
+        const label = dom('label', '', 'Retained text (not rendered)');
+        const input = dom('textarea', 'sk-notes');
+        input.setAttribute('aria-label', 'Retained text (not rendered)');
+        input.value = plainText(element.content); input.rows = 6; input.dataset.retainedId = element.id;
+        input.addEventListener('input', () => owner.run(() => store.updateElement(element.id, { content: paragraph(input.value) })));
+        label.append(input);
+        content.append(section('Retained source content', label, dom('p', 'sk-note', 'Editable source text omitted by the original template. It stays hidden in previews, video and exports. Notes and narration are unchanged.')));
+        return;
+      }
       const update = patch => owner.run(() => { owner.text.stop(); store.updateElement(element.id, patch); });
       const geometry = dom('div', 'sk-field-grid');
       for (const [key, label, min] of [['x', 'X', -100000], ['y', 'Y', -100000], ['width', t('宽度'), 1], ['height', t('高度'), 1]]) {
@@ -195,17 +206,20 @@ export class Panels {
         if (BLOCK_ARROWS.includes(element.shape)) appearance.append(field(t('箭杆比例 %'), numberInput((element.arrowShaft ?? 0.5) * 100, value => update({ arrowShaft: value / 100 }), { min: 0, max: 100 })));
         content.append(appearance);
       }
-      const shadowSection = section(t('阴影'));
-      const shadowMode = selectInput([['none', t('无阴影')], ['outer', t('外阴影')]], element.shadow ? 'outer' : 'none', value => {
+      const currentShadow = element.frame?.shadow || element.shadow;
+      const changeShadow = patch => update(element.frame ? { frame: { ...store.elements[0].frame, shadow: { ...store.elements[0].frame.shadow, ...patch } } } : { shadow: { ...store.elements[0].shadow, ...patch } });
+      const shadowSection = section(element.frame ? 'Image frame' : t('阴影'));
+      if (element.frame) shadowSection.append(field('Corner radius (px)', numberInput(element.frame.radius, value => update({ frame: { ...store.elements[0].frame, radius: value } }), { min: 0, max: 128 })));
+      const shadowMode = selectInput([['none', t('无阴影')], ['outer', t('外阴影')]], currentShadow && currentShadow.opacity > 0 ? 'outer' : 'none', value => {
         shadowMode.blur();
-        update({ shadow: value === 'outer' ? { color: '#000000', opacity: 0.2, blur: 16, offsetX: 4, offsetY: 4, rotateWithShape: false } : null });
+        if (element.frame) changeShadow({ opacity: value === 'outer' ? 0.2 : 0 });
+        else update({ shadow: value === 'outer' ? { color: '#000000', opacity: 0.2, blur: 16, offsetX: 4, offsetY: 4, rotateWithShape: false } : null });
       });
       shadowSection.append(field(t('阴影类型'), shadowMode));
-      if (element.shadow) {
-        const changeShadow = patch => update({ shadow: { ...store.elements[0].shadow, ...patch } });
-        shadowSection.append(field(t('阴影颜色'), colorInput(element.shadow.color, value => changeShadow({ color: value }), owner.t)));
-        for (const [key, label, min, max] of [['blur', t('阴影模糊'), 0, 1000], ['offsetX', t('阴影水平偏移'), -10000, 10000], ['offsetY', t('阴影垂直偏移'), -10000, 10000]]) shadowSection.append(field(label, numberInput(element.shadow[key], value => changeShadow({ [key]: value }), { min, max })));
-        shadowSection.append(field(t('阴影不透明度 %'), numberInput(element.shadow.opacity * 100, value => changeShadow({ opacity: value / 100 }), { min: 0, max: 100 })));
+      if (currentShadow) {
+        shadowSection.append(field(t('阴影颜色'), colorInput(currentShadow.color, value => changeShadow({ color: value }), owner.t)));
+        for (const [key, label, min, max] of [['blur', t('阴影模糊'), 0, element.frame ? 128 : 1000], ['offsetX', t('阴影水平偏移'), element.frame ? -256 : -10000, element.frame ? 256 : 10000], ['offsetY', t('阴影垂直偏移'), element.frame ? -256 : -10000, element.frame ? 256 : 10000]]) shadowSection.append(field(label, numberInput(currentShadow[key], value => changeShadow({ [key]: value }), { min, max })));
+        shadowSection.append(field(t('阴影不透明度 %'), numberInput(currentShadow.opacity * 100, value => changeShadow({ opacity: value / 100 }), { min: 0, max: 100 })));
       }
       content.append(shadowSection);
       if (element.type === 'image') content.append(section(t('图片设置'),
@@ -256,7 +270,7 @@ export class Panels {
     [...store.slide.elements].reverse().forEach(element => {
       const row = dom('div', 'sk-layer' + (store.selected.includes(element.id) ? ' sk-active' : ''));
       row.dataset.elementId = element.id;
-      row.draggable = !element.locked && store.mode === 'edit';
+      row.draggable = !element.retained && !element.locked && store.mode === 'edit';
       row.addEventListener('dragstart', event => { event.dataTransfer.setData('application/x-slidekit-layer', element.id); });
       row.addEventListener('dragover', event => { if (store.mode === 'edit') event.preventDefault(); });
       row.addEventListener('drop', event => {
@@ -265,7 +279,7 @@ export class Panels {
         if (id) owner.run(() => store.moveElement(id, store.slide.elements.findIndex(item => item.id === element.id)));
       });
       const name = element.type === 'text' ? plainText(element.content).slice(0, 30) || t('空文本') : element.type === 'image' ? store.doc.assets[element.assetId].name : { rect: t('矩形'), roundRect: t('圆角矩形'), ellipse: t('椭圆'), line: t('直线'), arrow: t('箭头'), rightArrow: t('向右箭头'), leftArrow: t('向左箭头'), upArrow: t('向上箭头'), downArrow: t('向下箭头'), leftRightArrow: t('水平双向箭头'), upDownArrow: t('垂直双向箭头') }[element.shape];
-      const select = button(name, element.type === 'shape' ? BLOCK_ARROWS.includes(element.shape) ? 'arrow' : element.shape : element.type, event => owner.run(() => {
+      const select = button((element.retained ? 'Retained text: ' : '') + name, element.type === 'shape' ? BLOCK_ARROWS.includes(element.shape) ? 'arrow' : element.shape : element.type, event => owner.run(() => {
         owner.text.stop();
         store.selectElements(event.shiftKey ? [...store.selected, element.id] : [element.id]);
       }));
@@ -277,6 +291,7 @@ export class Panels {
         move.disabled = element.locked;
         row.append(move);
       }
+      if (element.retained) row.querySelectorAll('button').forEach(control => { if (control !== select) control.disabled = true; });
       content.append(row);
     });
   }

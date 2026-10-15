@@ -1,3 +1,4 @@
+import { readMigrationMarker, verifyFrameGeometry } from './pptx-migration.js';
 import { imageSize } from 'image-size';
 import { ARROW_ENDS, BLOCK_ARROWS, SHAPES, createDocument, createElement, emptySlide, MAX_SLIDES, uid, validateDocument } from './document.js';
 import { at, attr, children, EMU_PER_PIXEL, numeric, openPptxPackage, relationshipId } from './pptx-package.js';
@@ -198,6 +199,7 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
           warn('隐藏对象「' + (attr(nonVisual, 'name') || kind) + '」已跳过');
           continue;
         }
+        const migration = readMigrationMarker(nonVisual);
         const ph = placeholder(node);
         if (inherited && ph) continue;
         if (kind === 'grpSp') {
@@ -218,7 +220,9 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
         if (kind === 'pic') {
           const name = attr(at(node, 'nvPicPr/cNvPr'), 'name') || t('图片');
           const picture = await image(pictureChildren(node, 'blipFill'), path, mirrored, name);
-          if (picture) add(createElement('image', { ...box, ...picture, ...(shadow ? { shadow } : {}), fit: 'cover' }));
+          if (migration?.retained) throw Error('Retained text metadata on a picture');
+          if (migration?.frame && picture) verifyFrameGeometry(shapeProperties, migration.frame, { width, height }, shadow, at(node, 'blipFill'), doc.assets[picture.assetId], migration.fit);
+          if (picture) add(createElement('image', { ...box, ...picture, ...(migration?.frame ? { frame: migration.frame, fit: migration.fit } : { ...(shadow ? { shadow } : {}), fit: 'cover' }) }));
           continue;
         }
         if (!['sp', 'cxnSp'].includes(kind)) {
@@ -307,6 +311,7 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
         if (body && (truth(attr(at(node, 'nvSpPr/cNvSpPr'), 'txBox')) || children(body, 'p').some(paragraph => children(paragraph).some(run => run.localName === 'br' || at(run, 't')?.textContent)))) {
           const category = ph?.type?.includes('Title') || ph?.type === 'title' ? 'titleStyle' : ph?.type === 'body' || ph?.type === 'obj' ? 'bodyStyle' : 'otherStyle';
           const text = readText(body, { theme, defaults: [at(presentation, 'defaultTextStyle'), at(master?.root, 'txStyles/' + category)].filter(Boolean), inheritedBodies: [at(masterShape, 'txBody'), at(layoutShape, 'txBody')].filter(Boolean), warn });
+          if (migration?.frame || migration?.retained && text.opacity !== 0) throw Error('Invalid retained text or frame metadata');
           const bodyProperties = at(body, 'bodyPr');
           const left = px(bodyProperties, 'lIns', 9.6), right = px(bodyProperties, 'rIns', 9.6), top = px(bodyProperties, 'tIns', 4.8), bottom = px(bodyProperties, 'bIns', 4.8);
           const anchor = [bodyProperties, at(layoutShape, 'txBody/bodyPr'), at(masterShape, 'txBody/bodyPr')].map(properties => attr(properties, 'anchor')).find(Boolean) || 't';
@@ -320,7 +325,7 @@ export async function readPptx(file, { signal, onProgress, t = createTranslator(
           // retaining rotation, reflected group angles and actual world bounds.
           const reflectedHorizontally = horizontalReflection !== truth(attr(transformNode, 'flipH'));
           textBox.rotation = ((textBox.rotation - (reflectedHorizontally ? 180 : 0) + 540) % 360) - 180;
-          add(createElement('text', { ...textBox, ...text, verticalAlign, ...(!shapeAdded && shadow ? { shadow } : {}) }));
+          add(createElement('text', { ...textBox, ...text, ...(migration?.retained ? { retained: migration.retained } : {}), verticalAlign, ...(!shapeAdded && shadow ? { shadow } : {}) }));
         }
       }
     }
