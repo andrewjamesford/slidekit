@@ -89,3 +89,14 @@ test('complex geometry and appearance keep the SVG renderer', () => {
     { gradient: { stops: [] } }, { shadow: {} },
   ]) assert.equal(usesCssPrimitive({ ...flat, ...patch }), false);
 });
+
+// Historical loaders fixed optical size. Keep unmodified variable font bytes
+// and control rendering through CSS, rather than deleting variation axes.
+test('text disables automatic optical sizing while retaining authored font data', () => {
+  const previous = globalThis.document;
+  globalThis.document = { createTextNode: text => ({ textContent: text }), createElement: () => ({ style: {}, dataset: {}, children: [], append(child) { this.children.push(child); } }) };
+  try {
+    const node = renderElement(createElement('text', { fontFamily: 'Merriweather' }), {});
+    assert.equal(node.style.fontOpticalSizing, 'none');
+  } finally { globalThis.document = previous; }
+});

@@ -125,7 +125,7 @@ export function renderElement(element, assets) {
   if (['line', 'arrow'].includes(element.shape)) node.style.overflow = 'visible';
   if (element.type === 'text') {
     node.style.overflow = element.textOverflow === 'visible' ? 'visible' : 'hidden';
-    Object.assign(node.style, { fontFamily: element.fontFamily, fontSize: element.fontSize + 'pt', color: element.color, lineHeight: String(element.lineHeight) });
+    Object.assign(node.style, { fontOpticalSizing: 'none', fontFamily: element.fontFamily, fontSize: element.fontSize + 'pt', color: element.color, lineHeight: String(element.lineHeight) });
     node.style.display = 'flex'; node.style.flexDirection = 'column';
     node.style.justifyContent = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[element.verticalAlign || 'top'];
     const text = renderText(element.content); text.style.flexShrink = '0'; node.append(text);
