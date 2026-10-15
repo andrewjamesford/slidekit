@@ -32,7 +32,7 @@ test('framed image paints its exact box shadow and retained text cannot particip
   assert.equal(n.style.left, '-20px'); assert.equal(n.style.transform, 'none'); assert.equal(n.style.overflow, 'visible');
   assert.equal(n.children[0].style.borderRadius, '8px'); assert.equal(n.children[0].style.boxShadow, '0px 4px 20px rgba(0,0,0,0.15)');
   const t = renderElement(createElement('text', { retained, opacity: 1, content: paragraph('Retained') }), {});
-  assert.equal(t.style.opacity, '0'); assert.equal(t.dataset.locked, 'true'); assert.equal(t.style.pointerEvents, 'none');
+  assert.equal(t.ariaHidden, 'true'); assert.equal(t.inert, true); assert.equal(t.style.opacity, '0'); assert.equal(t.dataset.locked, 'true'); assert.equal(t.style.pointerEvents, 'none');
  } finally { globalThis.document = old; }
 });
 for (const opacity of [0.15, 0.3]) test('native framed picture geometry and shadow round trip at alpha ' + opacity, async () => {

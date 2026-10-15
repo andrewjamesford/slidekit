@@ -120,7 +120,7 @@ export function renderElement(element, assets) {
   const node = dom('div', 'sk-element sk-' + element.type);
   node.dataset.elementId = element.id;
   node.dataset.locked = String(element.locked || !!element.retained);
-  if (element.retained) { node.style.pointerEvents = 'none'; node.dataset.retained = 'true'; }
+  if (element.retained) { node.style.pointerEvents = 'none'; node.dataset.retained = 'true'; node.ariaHidden = 'true'; node.inert = true; }
   positionElement(node, element);
   if (['line', 'arrow'].includes(element.shape)) node.style.overflow = 'visible';
   if (element.type === 'text') {
