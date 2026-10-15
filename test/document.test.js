@@ -1063,3 +1063,31 @@ test('empty PPTX paragraphs stay empty while intentional literal spaces survive 
     assert.equal(current.slides[0].elements[0].content.content.length,5);
   }
 });
+
+
+test('text insertion respects an optional default font without rewriting existing text or extra undo events', () => {
+  for (const configured of [undefined, 'Liberation Sans']) {
+    const doc = createDocument();
+    doc.slides[0].elements.push(createElement('text', {fontFamily:'Georgia',content:paragraph('Existing') }));
+    const store = new DocumentStore(doc, 'edit', createTranslator('en'), configured);
+    const before = store.getDocument();
+    const changes = []; store.on('change', event => changes.push(event.reason));
+    let selected;
+    const owner = {store, text:{stop(){}, start(id){selected=id;}, editor:{commands:{selectAll(){}}}}};
+    SlideEditor.prototype.insertText.call(owner);
+    assert.equal(store.slide.elements.find(e => e.id === selected).fontFamily, configured ?? 'Arial');
+    assert.equal(store.slide.elements[0].fontFamily, 'Georgia');
+    assert.deepEqual(changes, ['add-element']);
+    store.undo(); assert.deepEqual(store.getDocument(), before);
+    store.redo(); assert.equal(store.slide.elements.at(-1).fontFamily, configured ?? 'Arial');
+    const explicit = store.addElement('text',{fontFamily:'Noto Sans'});
+    assert.equal(store.slide.elements.find(e => e.id === explicit).fontFamily,'Noto Sans');
+    store.setDocument(doc); assert.deepEqual(store.getDocument(),before);
+  }
+});
+
+test('default font validates before text mutations and does not alter the generic element factory', () => {
+  for (const invalid of ['', 'x; color:red', '<script>', null, 42])
+    assert.throws(() => new DocumentStore(undefined,'edit',createTranslator('en'),invalid), /Invalid default font/);
+  assert.equal(createElement('text').fontFamily,'Arial');
+});

@@ -75,10 +75,12 @@ export class Toolbar {
     panelButtons.append(button(t('切换页面栏'), 'panelLeft', () => owner.togglePanel('thumbnails'), 'sk-icon-only'), button(t('切换属性栏'), 'panelRight', () => owner.togglePanel('inspector'), 'sk-icon-only'));
     tools.append(panelButtons);
     const format = dom('div', 'sk-format');
-    this.fontFamily = selectInput([
+    const fontOptions = [
       ['Arial', 'Arial'], ['Aptos', 'Aptos'], ['Georgia', 'Georgia'],
       ['PingFang SC', t('苹方')], ['Microsoft YaHei', t('微软雅黑')], ['Noto Sans CJK SC', t('思源黑体')],
-    ], 'Arial', value => owner.run(() => owner.text.format('fontFamily', value)));
+    ];
+    if (!fontOptions.some(([family]) => family === owner.defaultFontFamily)) fontOptions.unshift([owner.defaultFontFamily, owner.defaultFontFamily]);
+    this.fontFamily = selectInput(fontOptions, owner.defaultFontFamily, value => owner.run(() => owner.text.format('fontFamily', value)));
     this.fontFamily.setAttribute('aria-label', t('字体'));
     this.fontFamily.classList.add('sk-font-family');
     this.fontSize = numberInput(28, value => owner.run(() => owner.text.format('fontSize', value)), { min: 1, max: 256 });

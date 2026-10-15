@@ -1,4 +1,4 @@
-import { clone, cloneAsset, cloneDocument, createDocument, createElement, emptySlide, paragraph, uid, validateDocument, validateDocumentInPlace } from './document.js';
+import { DEFAULT_FONT, isFontFamily, clone, cloneAsset, cloneDocument, createDocument, createElement, emptySlide, paragraph, uid, validateDocument, validateDocumentInPlace } from './document.js';
 import { History } from './history.js';
 import { createTranslator, translateMessage } from './i18n.js';
 
@@ -9,7 +9,9 @@ function removeUnusedAssets(doc) {
 }
 
 export class DocumentStore {
-  constructor(doc, mode = 'edit', t = createTranslator()) {
+  constructor(doc, mode = 'edit', t = createTranslator(), defaultFontFamily = DEFAULT_FONT) {
+    if (!isFontFamily(defaultFontFamily)) throw new Error('Invalid default font family');
+    this.defaultFontFamily = defaultFontFamily;
     if (!['edit', 'view'].includes(mode)) throw new Error('模式必须是 edit 或 view');
     this.t = t;
     if (doc === undefined) {
@@ -154,7 +156,7 @@ export class DocumentStore {
     this.commit(doc => doc.slides.splice(index, 0, doc.slides.splice(from, 1)[0]), 'move-slide');
   }
   addElement(type, properties = {}) {
-    const element = createElement(type, type === 'text' ? { content: paragraph(this.t('双击编辑文字')), ...properties } : properties);
+    const element = createElement(type, type === 'text' ? { content: paragraph(this.t('双击编辑文字')), fontFamily: this.defaultFontFamily, ...properties } : properties);
     this.commit(doc => doc.slides.find(slide => slide.id === this.slideId).elements.push(element), 'add-element', null, () => {
       this.selected = [element.id];
     });

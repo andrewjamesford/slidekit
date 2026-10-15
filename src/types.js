@@ -12,7 +12,7 @@
  * @typedef {{schemaVersion: 2, title: string, width: number, height: number, slides: Slide[], assets: Record<string, ImageAsset>}} Deck
  * @typedef {{maxFileSizeMB?: number, maxPages?: number, maxRenderedSizeMB?: number}} PdfLimits
  * @typedef {'zh-CN'|'zh-TW'|'en'|'ko'|'ja'} EditorLocale
- * @typedef {{document?: Deck, mode?: 'edit'|'view', locale?: EditorLocale, theme?: {accent?: string}, ui?: {embedded?: boolean, open?: boolean, toolbar?: boolean, thumbnails?: boolean, inspector?: boolean}, pdfAssetsUrl?: string, pdfLimits?: PdfLimits}} EditorOptions
+ * @typedef {{document?: Deck, defaultFontFamily?: string, mode?: 'edit'|'view', locale?: EditorLocale, theme?: {accent?: string}, ui?: {embedded?: boolean, open?: boolean, toolbar?: boolean, thumbnails?: boolean, inspector?: boolean}, pdfAssetsUrl?: string, pdfLimits?: PdfLimits}} EditorOptions
  * @typedef {'change'|'selectionChange'|'slideChange'|'error'} EditorEvent
  */
 export {};

@@ -22,7 +22,8 @@ export class SlideEditor {
     this.t = createTranslator(this.locale);
     this.options = options;
     this.pdfLimits = resolvePdfLimits(options.pdfLimits);
-    this.store = new DocumentStore(options.document, options.mode, (...args) => this.t(...args));
+    this.store = new DocumentStore(options.document, options.mode, (...args) => this.t(...args), options.defaultFontFamily);
+    this.defaultFontFamily = this.store.defaultFontFamily;
     this.destroyed = false;
     this.zoom = 1;
     this.autoFit = true;
