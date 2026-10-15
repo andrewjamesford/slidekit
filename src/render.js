@@ -111,7 +111,7 @@ export function positionElement(node, element) {
   Object.assign(node.style, {
     left: layout ? element.x + 'px' : '0', top: layout ? element.y + 'px' : '0',
     width: element.width + 'px', height: element.height + 'px',
-    transform: layout ? 'none' : 'translate(' + element.x + 'px, ' + element.y + 'px) rotate(' + element.rotation + 'deg)', opacity: String(element.opacity),
+    transform: layout ? 'none' : 'translate(' + element.x + 'px, ' + element.y + 'px) rotate(' + element.rotation + 'deg)', opacity: String(element.retained ? 0 : element.opacity),
     filter: element.shadow ? shadowCss(element.shadow, element.rotation) : '',
   });
 }

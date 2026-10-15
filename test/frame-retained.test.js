@@ -31,7 +31,7 @@ test('framed image paints its exact box shadow and retained text cannot particip
   const d = imageDoc(), n = renderElement(d.slides[0].elements[0], d.assets);
   assert.equal(n.style.left, '-20px'); assert.equal(n.style.transform, 'none'); assert.equal(n.style.overflow, 'visible');
   assert.equal(n.children[0].style.borderRadius, '8px'); assert.equal(n.children[0].style.boxShadow, '0px 4px 20px rgba(0,0,0,0.15)');
-  const t = renderElement(createElement('text', { retained, opacity: 0, content: paragraph('Retained') }), {});
+  const t = renderElement(createElement('text', { retained, opacity: 1, content: paragraph('Retained') }), {});
   assert.equal(t.style.opacity, '0'); assert.equal(t.dataset.locked, 'true'); assert.equal(t.style.pointerEvents, 'none');
  } finally { globalThis.document = old; }
 });
