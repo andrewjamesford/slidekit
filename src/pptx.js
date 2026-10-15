@@ -1,6 +1,6 @@
 import { normalizePptxParagraphs } from './pptx-normalize.js';
 import PptxGenJS from 'pptxgenjs';
-import { validateDocument } from './document.js';
+import { validateDocument, plainText } from './document.js';
 import { writePptxAppearance } from './pptx-appearance.js';
 
 const inch = px => px / 96;
@@ -105,6 +105,7 @@ export async function exportPptx(input) {
     const objects = [];
     appearance.push({ gradient: source.backgroundGradient, objects });
     for (const [index, element] of source.elements.entries()) {
+      if (element.retained && xmlText(plainText(element.content)) !== plainText(element.content)) throw Error('Retained text contains XML-invalid characters; export refused without changing source');
       const objectName = { text: '文字', shape: '形状', image: '图片' }[element.type] + ' ' + (index + 1);
       const object = { name: objectName, element, runs: null };
       objects.push(object);

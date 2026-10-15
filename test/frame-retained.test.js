@@ -69,3 +69,9 @@ test('zero radius and disabled frame shadow remain native-round-trip safe', asyn
  const d = imageDoc(); d.slides[0].elements[0].frame.radius = 0; d.slides[0].elements[0].frame.shadow.opacity = 0;
  const r = await readPptx(await exportPptx(d)); assert.deepEqual(r.document.slides[0].elements[0].frame, d.slides[0].elements[0].frame);
 });
+
+
+test('retained XML-invalid source refuses export instead of replacing bytes', async () => {
+ const d = createDocument(); d.slides[0].elements.push(createElement('text', { retained, opacity: 0, content: paragraph('Keep\u0000exact') }));
+ await assert.rejects(exportPptx(d), /XML-invalid/); assert.equal(plainText(d.slides[0].elements[0].content), 'Keep\u0000exact');
+});
