@@ -154,7 +154,10 @@ export class Panels {
         const input = dom('textarea', 'sk-notes');
         input.setAttribute('aria-label', 'Retained text (not rendered)');
         input.value = plainText(element.content); input.rows = 6; input.dataset.retainedId = element.id;
-        input.addEventListener('input', () => owner.run(() => store.updateElement(element.id, { content: paragraph(input.value) })));
+        input.addEventListener('input', () => owner.run(() => {
+          const current = store.slide.elements.find(item => item.id === element.id);
+          if (current && plainText(current.content) !== input.value) store.updateElement(element.id, { content: paragraph(input.value) });
+        }));
         label.append(input);
         content.append(section('Retained source content', label, dom('p', 'sk-note', 'Editable source text omitted by the original template. It stays hidden in previews, video and exports. Notes and narration are unchanged.')));
         return;
