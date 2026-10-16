@@ -1,9 +1,20 @@
 import { Editor, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import { TextStyleKit } from '@tiptap/extension-text-style';
+import { cssFontFamily } from './css-font-family.js';
+import { TextStyleKit, FontFamily } from '@tiptap/extension-text-style';
 import TextAlign from '@tiptap/extension-text-align';
 import { clone, isColor, isFontFamily, validateGradient, validateText } from './document.js';
 import { textGradientStyle } from './appearance.js';
+
+const QuotedFontFamily = FontFamily.extend({
+  addGlobalAttributes() {
+    return this.parent().map(spec => ({ ...spec, attributes: { ...spec.attributes,
+      fontFamily: { ...spec.attributes.fontFamily,
+        renderHTML: attributes => attributes.fontFamily ? { style: 'font-family:' + cssFontFamily(attributes.fontFamily) } : {},
+      },
+    } }));
+  },
+});
 
 const GradientText = Extension.create({
   name: 'gradientText',
@@ -131,7 +142,8 @@ export class RichTextSession {
           horizontalRule: false, link: false, strike: false, trailingNode: false,
           dropcursor: false, gapcursor: false,
         }),
-        TextStyleKit.configure({ backgroundColor: false, lineHeight: false }),
+        TextStyleKit.configure({ backgroundColor: false, lineHeight: false, fontFamily: false }),
+        QuotedFontFamily,
         TextAlign.configure({ types: ['paragraph'] }),
         ParagraphSpacing,
         GradientText,
