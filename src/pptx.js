@@ -33,9 +33,18 @@ export function textRuns(element) {
   const result = [];
   const blocks = paragraphs(element.content);
   blocks.forEach(({ node, list, depth }, paragraphIndex) => {
+    // CSS unitless line-height scales the em size, not a font's natural metrics.
+    // Fixed point spacing matches it for uniform-size paragraphs. Keep mixed
+    // size paragraphs on the existing native-relative path.
+    const sizes = (node.content || []).filter(child => child.type === 'text').map(child => {
+      const value = child.marks?.find(mark => mark.type === 'textStyle' && mark.attrs?.fontSize)?.attrs.fontSize;
+      return value ? (/^\d+(?:\.\d+)?pt$/.test(value) ? parseFloat(value) : null) : element.fontSize;
+    });
+    const uniform = sizes.every(size => size !== null && size === sizes[0]);
+    const ratio = Number(node.attrs?.lineHeight || element.lineHeight);
     const common = {
       align: node.attrs?.textAlign || 'left',
-      lineSpacingMultiple: Number(node.attrs?.lineHeight || element.lineHeight),
+      ...(uniform ? { lineSpacing: (sizes[0] || element.fontSize) * ratio } : { lineSpacingMultiple: ratio }),
       paraSpaceAfter: 0, paraSpaceBefore: 0,
       transparency: (1 - element.opacity) * 100,
     };

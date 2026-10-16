@@ -43,19 +43,20 @@ export function readText(body, { theme, defaults = [], inheritedBodies = [], war
       ...inheritedBodies.flatMap(node => [at(node, 'lstStyle/' + levelName), at(node, 'p/pPr')]),
       at(body, 'lstStyle/' + levelName), direct,
     ].filter(Boolean);
-    let align = 'left', lineHeight = 1.2, list = null, start = 1;
+    let align = 'left', lineHeight = 1.2, pointSpacing = null, list = null, start = 1;
     for (const property of properties) {
       align = { l: 'left', ctr: 'center', r: 'right', just: 'justify' }[attr(property, 'algn')] || align;
       const spacing = at(property, 'lnSpc/spcPct');
-      if (spacing) lineHeight = clamp(numeric(spacing, 'val', 120000) / 100000, 0.8, 3);
-      if (at(property, 'lnSpc/spcPts')) warn('固定磅值行距按比例行距显示');
+      if (spacing) { lineHeight = clamp(numeric(spacing, 'val', 120000) / 100000, 0.8, 3); pointSpacing = null; }
+      const points = at(property, 'lnSpc/spcPts');
+      if (points) pointSpacing = numeric(points, 'val') / 100;
       if (at(property, 'buNone')) list = null;
       if (at(property, 'buChar')) list = 'bulletList';
       if (at(property, 'buAutoNum')) { list = 'orderedList'; start = clamp(numeric(at(property, 'buAutoNum'), 'startAt', 1), 1, 9999); }
     }
     if (level) warn('多级列表保留文字和列表标记，缩进已简化');
     const base = properties.map(node => at(node, 'defRPr'));
-    const runs = [];
+    const runs = [], fontSizes = [];
     for (const run of children(paragraph)) {
       if (run.localName === 'br') { runs.push({ type: 'hardBreak' }); continue; }
       if (!['r', 'fld'].includes(run.localName)) continue;
@@ -63,11 +64,18 @@ export function readText(body, { theme, defaults = [], inheritedBodies = [], war
       if (!text) continue;
       const style = runStyle([...base, at(run, 'rPr')], theme, warn);
       firstStyle ||= style;
+      fontSizes.push(style.fontSize);
       const marks = ['bold', 'italic', 'underline'].filter(key => style[key]).map(type => ({ type }));
       const attrs = { fontSize: style.fontSize + 'pt', fontFamily: style.fontFamily, color: style.color, ...(style.gradient ? { gradient: style.gradient } : {}), ...(style.opacity !== 1 ? { opacity: style.opacity } : {}) };
       paints.push(attrs);
       marks.push({ type: 'textStyle', attrs });
       runs.push({ type: 'text', text, marks });
+    }
+    if (pointSpacing !== null) {
+      const basis = fontSizes.length ? fontSizes.reduce((maximum, size) => Math.max(maximum, size), 0) : runStyle([...base, at(paragraph, 'endParaRPr')], theme, warn).fontSize;
+      const ratio = pointSpacing / basis;
+      lineHeight = clamp(ratio, 0.8, 3);
+      if (fontSizes.some(size => size !== basis) || ratio !== lineHeight) warn('固定磅值行距按比例行距显示');
     }
     const node = { type: 'paragraph', attrs: { textAlign: align, lineHeight: String(lineHeight) }, content: runs };
     if (list) {
