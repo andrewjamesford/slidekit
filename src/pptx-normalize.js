@@ -6,6 +6,14 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
  */
 export async function normalizePptxParagraphs(bytes) {
   const zip = await JSZip.loadAsync(bytes);
+  // PptxGenJS emits unused slide-master overrides for multi-slide decks.
+  // Only normalize our generated package; do not repair imported originals.
+  const types = new DOMParser().parseFromString(await zip.file('[Content_Types].xml').async('string'), 'application/xml');
+  for (const override of Array.from(types.getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/content-types', 'Override'))) {
+    const part = override.getAttribute('PartName');
+    if (part?.startsWith('/ppt/slideMasters/') && !zip.file(part.slice(1))) override.parentNode.removeChild(override);
+  }
+  zip.file('[Content_Types].xml', new XMLSerializer().serializeToString(types));
   for (const file of Object.values(zip.files)) {
     const notes = /^ppt\/notesSlides\/notesSlide[^/]+\.xml$/.test(file.name);
     if (!notes && !/^ppt\/slides\/slide[^/]+\.xml$/.test(file.name)) continue;
