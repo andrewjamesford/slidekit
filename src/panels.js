@@ -174,13 +174,14 @@ export class Panels {
         const fit = button('Fit text box to content', null, () => owner.run(() => owner.fitTextBoxToContent(element.id)));
         fit.disabled = element.locked || store.mode !== 'edit';
         fit.title = 'Keeps text size and width. Resizes height only.';
-        content.append(fit);
-        content.append(field('Vertical alignment', selectInput([['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']], element.verticalAlign || 'top', value => update({ verticalAlign: value }))));
+        const textLayout = dom('div', 'sk-inspector-section sk-text-layout-controls');
+        textLayout.append(fit, field('Vertical alignment', selectInput([['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']], element.verticalAlign || 'top', value => update({ verticalAlign: value }))));
         const textNode = owner.elementNode(element.id);
         if (textNode && Math.max(textNode.scrollHeight, textNode.firstElementChild?.scrollHeight || 0) > textNode.clientHeight + 1) {
           const warning = dom('p', '', 'Text exceeds this box and will be clipped. Fit the text box to content or increase its height.');
-          warning.setAttribute('role', 'status'); content.append(warning);
+          warning.setAttribute('role', 'status'); textLayout.append(warning);
         }
+        content.append(textLayout);
       }
       if (element.type === 'shape') {
         const appearance = section(t('外观'),
